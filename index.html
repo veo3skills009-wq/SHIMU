@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>My Tap Game</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <style>
+        /* Yeh CSS game ko behtar look denay ke liye hai */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #1a1a1a; /* Dark background */
+            color: white;
+            overflow: hidden; /* Page ko scroll honay se roknay ke liye */
+            user-select: none; /* Text select na ho */
+            -webkit-user-select: none; /* Safari ke liye */
+        }
+
+        #user-info {
+            font-size: 18px;
+            font-weight: bold;
+            position: absolute;
+            top: 20px;
+        }
+
+        #score-display {
+            font-size: 64px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        #coin-button {
+            width: 250px;
+            height: 250px;
+            background: linear-gradient(145deg, #f0c14b, #e0a800);
+            border-radius: 50%; /* Isay goal banata hai */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 80px;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            border: 10px solid #f0c14b80;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            transition: transform 0.05s ease; /* Tap effect ke liye */
+        }
+
+        /* Jab user tap karay to button thora chota ho */
+        #coin-button:active {
+            transform: scale(0.95);
+        }
+
+        #tap-animation-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Is ke zariye click coin tak pohnchay */
+            overflow: hidden;
+        }
+
+        .tap-number {
+            position: absolute;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            animation: float-up 1s ease-out forwards;
+        }
+
+        /* Animation jab +1 upar jaye */
+        @keyframes float-up {
+            from {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(-80px) scale(1.5);
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="user-info">Loading...</div>
+    <h2>Aap ka Score:</h2>
+    <div id="score-display">0</div>
+    
+    <div id="coin-button" ontouchstart="handleTap(event)" onmousedown="handleTap(event)">
+        🪙
+    </div>
+
+    <div id="tap-animation-container"></div>
+
+
+    <script>
+        let score = 0;
+        const scoreDisplay = document.getElementById('score-display');
+        const coinButton = document.getElementById('coin-button');
+        const userInfoDisplay = document.getElementById('user-info');
+        const animationContainer = document.getElementById('tap-animation-container');
+
+        // 1. Telegram Web App ko initialize karein
+        const tg = window.Telegram.WebApp;
+        tg.ready(); // Telegram ko batayein ke app load ho chuki hai
+
+        // Haptic feedback (vibration) ko enable karein
+        tg.expand();
+
+        // 2. User ka naam hasil karein (agar user ne ijazat di ho)
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            userInfoDisplay.innerText = `Khush Amdeed, ${tg.initDataUnsafe.user.first_name}!`;
+        } else {
+            userInfoDisplay.innerText = "Welcome, Guest!";
+        }
+
+        // 3. Score load karein (Abhi ke liye 0 hai)
+        // (Asal game main, yahan aap backend se score load karein gay)
+        loadScore(); 
+
+        function loadScore() {
+            // Farz karein backend se score '123' mila
+            // score = 123; 
+            scoreDisplay.innerText = score;
+        }
+
+        // 4. Tap ko handle karnay wala function
+        function handleTap(event) {
+            // Click/touch event ko default behavior se rokein
+            event.preventDefault();
+
+            score++;
+            scoreDisplay.innerText = score;
+
+            // Haptic feedback (vibration) trigger karein
+            tg.HapticFeedback.impactOccurred('light');
+
+            // "+1" animation dikhayein
+            // Agar multiple fingers se tap ho raha hai (touches)
+            if (event.touches) {
+                Array.from(event.touches).forEach(touch => {
+                    showTapAnimation(touch.clientX, touch.clientY);
+                });
+            } else {
+                // Agar mouse click hai
+                showTapAnimation(event.clientX, event.clientY);
+            }
+            
+            // (Future Step): Yahan hum score ko backend par save karein gay
+            // saveScoreToBackend(score);
+        }
+
+        // 5. "+1" animation dikhanay wala function
+        function showTapAnimation(x, y) {
+            const tapNumber = document.createElement('div');
+            tapNumber.innerText = "+1";
+            tapNumber.className = 'tap-number';
+            
+            // Randomly x-axis par thora idhar udhar karein
+            const randomX = Math.floor(Math.random() * 40) - 20;
+            
+            tapNumber.style.left = `${x + randomX}px`;
+            tapNumber.style.top = `${y - 30}px`; // Click se thora upar
+
+            animationContainer.appendChild(tapNumber);
+
+            // Animation khatam honay par element ko remove kar dein
+            setTimeout(() => {
+                tapNumber.remove();
+            }, 1000); // 1 second (animation duration)
+        }
+        
+        // (Future Step): Backend par score save karnay ka function
+        /*
+        function saveScoreToBackend(newScore) {
+            console.log(`Saving score to backend: ${newScore}`);
+            // Yahan fetch() ya axios() ka istemal ho ga
+            // fetch('https://your-backend-url.com/save-score', {
+            //     method: 'POST',
+            //     headers: {
+            //         'Content-Type': 'application/json',
+            //     },
+            //     body: JSON.stringify({ 
+            //         userId: tg.initDataUnsafe.user.id, 
+            //         score: newScore 
+            //     })
+            // });
+        }
+        */
+
+    </script>
+</body>
+</html>
