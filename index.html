@@ -7,78 +7,119 @@
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
     <style>
-        /* Yeh CSS game ko behtar look denay ke liye hai */
+        /* --- Yeh CSS game ko professional look denay ke liye hai --- */
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
-            padding: 0;
+            padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background-color: #1a1a1a; /* Dark background */
+            justify-content: space-between; /* Content ko upar neechay phailata hai */
+            height: calc(100vh - 40px); /* Poori height, padding ko minus kar ke */
+            background: linear-gradient(180deg, #3a3a3a 0%, #1a1a1a 100%);
             color: white;
-            overflow: hidden; /* Page ko scroll honay se roknay ke liye */
-            user-select: none; /* Text select na ho */
-            -webkit-user-select: none; /* Safari ke liye */
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         #user-info {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
-            position: absolute;
-            top: 20px;
+            color: #ccc;
+        }
+
+        #score-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        #score-display-label {
+            font-size: 24px;
+            font-weight: 500;
         }
 
         #score-display {
-            font-size: 64px;
+            font-size: 72px;
             font-weight: bold;
-            margin-bottom: 20px;
         }
 
         #coin-button {
-            width: 250px;
-            height: 250px;
-            background: linear-gradient(145deg, #f0c14b, #e0a800);
-            border-radius: 50%; /* Isay goal banata hai */
+            width: 280px; /* Thora bara coin */
+            height: 280px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 80px;
-            font-weight: bold;
-            color: #333;
             cursor: pointer;
-            border: 10px solid #f0c14b80;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-            transition: transform 0.05s ease; /* Tap effect ke liye */
+            transition: transform 0.05s ease;
+            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.3)); /* Coin ka shadow */
+        }
+        
+        #coin-button img {
+            width: 100%;
+            pointer-events: none; /* Ta ke click image par nahi, button par register ho */
         }
 
-        /* Jab user tap karay to button thora chota ho */
         #coin-button:active {
-            transform: scale(0.95);
+            transform: scale(0.95); /* Tap effect */
+            filter: drop-shadow(0 5px 10px rgba(0,0,0,0.4));
         }
 
+        #energy-section {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        #energy-text {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        #energy-container {
+            width: 100%;
+            height: 20px;
+            background-color: #555;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid #777;
+        }
+
+        #energy-bar {
+            width: 100%; /* Shuru main full */
+            height: 100%;
+            background: linear-gradient(90deg, #f0c14b, #e0a800);
+            border-radius: 8px;
+            transition: width 0.2s ease-out; /* Energy kam honay ka effect */
+        }
+
+        /* --- Tap Animation CSS --- */
         #tap-animation-container {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none; /* Is ke zariye click coin tak pohnchay */
+            pointer-events: none;
             overflow: hidden;
         }
 
         .tap-number {
             position: absolute;
-            font-size: 24px;
+            font-size: 36px;
             font-weight: bold;
             color: white;
-            animation: float-up 1s ease-out forwards;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            animation: float-up 1.5s ease-out forwards;
         }
 
-        /* Animation jab +1 upar jaye */
         @keyframes float-up {
             from {
                 opacity: 1;
@@ -86,119 +127,206 @@
             }
             to {
                 opacity: 0;
-                transform: translateY(-80px) scale(1.5);
+                transform: translateY(-100px) scale(1.5);
             }
         }
-
     </style>
 </head>
 <body>
 
     <div id="user-info">Loading...</div>
-    <h2>Aap ka Score:</h2>
-    <div id="score-display">0</div>
+
+    <div id="score-container">
+        <div id="score-display-label">Aap ka Score:</div>
+        <div id="score-display">0</div>
+    </div>
     
     <div id="coin-button" ontouchstart="handleTap(event)" onmousedown="handleTap(event)">
-        🪙
+        <img src="https://i.ibb.co/TqYvT1P/coin.png" alt="Tap Coin">
+    </div>
+
+    <div id="energy-section">
+        <div id="energy-text">Energy: 1000/1000</div>
+        <div id="energy-container">
+            <div id="energy-bar"></div>
+        </div>
     </div>
 
     <div id="tap-animation-container"></div>
 
 
     <script>
+        // ### Step 1: Aap Ki Supabase Keys Yahan Paste Kar Di Gayi Hain ###
+        
+        const SUPABASE_URL = 'https://wiitwqzzikalqganjqzb.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndpaXR3cXp6aWthbHFnYW5qcXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxMDAzNzIsImV4cCI6MjA3NzY3NjM3Mn0.nnIAdmhNKso3LO6Y1jO3DQ1UCFNnf9CKwNq-UiZjmNA';
+
+        // ######################################################
+
+        // Supabase client initialize karein
+        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Game ki state variables
         let score = 0;
+        let energy = 1000;
+        let maxEnergy = 1000;
+        let energyPerTap = 1;  // Har tap par kitni energy lagay gi
+        let energyRefillRate = 1; // Har second kitni energy wapas milay gi
+        
+        let telegramUser = null;
+        let isSaving = false; // Data save ho raha hai ya nahi
+        let saveTimer; // Thori der baad save karnay ke liye timer
+
+        // HTML Elements ko select karein
         const scoreDisplay = document.getElementById('score-display');
         const coinButton = document.getElementById('coin-button');
         const userInfoDisplay = document.getElementById('user-info');
         const animationContainer = document.getElementById('tap-animation-container');
+        const energyBar = document.getElementById('energy-bar');
+        const energyText = document.getElementById('energy-text');
 
-        // 1. Telegram Web App ko initialize karein
+        // 1. Telegram App ko initialize karein
         const tg = window.Telegram.WebApp;
-        tg.ready(); // Telegram ko batayein ke app load ho chuki hai
-
-        // Haptic feedback (vibration) ko enable karein
+        tg.ready();
         tg.expand();
 
-        // 2. User ka naam hasil karein (agar user ne ijazat di ho)
+        // 2. User ki info hasil karein
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            userInfoDisplay.innerText = `Khush Amdeed, ${tg.initDataUnsafe.user.first_name}!`;
+            telegramUser = tg.initDataUnsafe.user;
+            userInfoDisplay.innerText = `${telegramUser.first_name || 'User'} ${telegramUser.last_name || ''}`;
         } else {
-            userInfoDisplay.innerText = "Welcome, Guest!";
+            userInfoDisplay.innerText = "Error: Please open in Telegram";
+            coinButton.style.pointerEvents = 'none'; // Click disable kar dein
         }
 
-        // 3. Score load karein (Abhi ke liye 0 hai)
-        // (Asal game main, yahan aap backend se score load karein gay)
-        loadScore(); 
+        // 3. Database se User ka Score aur Energy Load karein
+        async function loadUserData() {
+            if (!telegramUser) return;
 
-        function loadScore() {
-            // Farz karein backend se score '123' mila
-            // score = 123; 
-            scoreDisplay.innerText = score;
+            // 'profiles' table se user ka data select karo
+            const { data, error } = await sb
+                .from('profiles')
+                .select('score, energy')
+                .eq('id', telegramUser.id.toString()) // Telegram ID se match karo
+                .single(); // Sirf 1 result chahiye
+
+            if (data) {
+                // Agar user mil gaya, to score aur energy update karo
+                score = data.score;
+                energy = data.energy;
+            } else {
+                // Agar naya user hai, to usay database main create karo
+                await sb.from('profiles').insert({ 
+                    id: telegramUser.id.toString(), 
+                    score: 0, 
+                    energy: maxEnergy,
+                    username: telegramUser.username || telegramUser.first_name
+                });
+                // Score aur energy default par set rahein gay
+            }
+            
+            // Screen par display update karo
+            updateScoreDisplay();
+            updateEnergyDisplay();
         }
 
-        // 4. Tap ko handle karnay wala function
+        // 4. Tap ko Handle karnay wala function
         function handleTap(event) {
-            // Click/touch event ko default behavior se rokein
             event.preventDefault();
+            if (!telegramUser || energy < energyPerTap) {
+                // Agar energy nahi hai, to kuch na karo
+                return;
+            }
 
+            // Energy kam karo
+            energy -= energyPerTap;
+            
+            // Score barhao
             score++;
-            scoreDisplay.innerText = score;
 
-            // Haptic feedback (vibration) trigger karein
+            // Display update karo
+            updateScoreDisplay();
+            updateEnergyDisplay();
+
+            // Haptic feedback (vibration)
             tg.HapticFeedback.impactOccurred('light');
 
             // "+1" animation dikhayein
-            // Agar multiple fingers se tap ho raha hai (touches)
             if (event.touches) {
                 Array.from(event.touches).forEach(touch => {
                     showTapAnimation(touch.clientX, touch.clientY);
                 });
             } else {
-                // Agar mouse click hai
                 showTapAnimation(event.clientX, event.clientY);
             }
             
-            // (Future Step): Yahan hum score ko backend par save karein gay
-            // saveScoreToBackend(score);
+            // Data ko foran save nahi karein gay, balkay 2 second baad karein gay
+            // Ta ke har tap par database call na ho
+            clearTimeout(saveTimer); // Puranay timer ko cancel karo
+            saveTimer = setTimeout(saveDataToBackend, 2000); // 2 second baad save karo
         }
 
-        // 5. "+1" animation dikhanay wala function
+        // 5. "+1" Animation Function
         function showTapAnimation(x, y) {
             const tapNumber = document.createElement('div');
             tapNumber.innerText = "+1";
             tapNumber.className = 'tap-number';
-            
-            // Randomly x-axis par thora idhar udhar karein
             const randomX = Math.floor(Math.random() * 40) - 20;
-            
             tapNumber.style.left = `${x + randomX}px`;
-            tapNumber.style.top = `${y - 30}px`; // Click se thora upar
-
+            tapNumber.style.top = `${y - 30}px`;
             animationContainer.appendChild(tapNumber);
-
-            // Animation khatam honay par element ko remove kar dein
             setTimeout(() => {
                 tapNumber.remove();
-            }, 1000); // 1 second (animation duration)
+            }, 1500); // Animation 1.5 second chalay ga
         }
         
-        // (Future Step): Backend par score save karnay ka function
-        /*
-        function saveScoreToBackend(newScore) {
-            console.log(`Saving score to backend: ${newScore}`);
-            // Yahan fetch() ya axios() ka istemal ho ga
-            // fetch('https://your-backend-url.com/save-score', {
-            //     method: 'POST',
-            //     headers: {
-            //         'Content-Type': 'application/json',
-            //     },
-            //     body: JSON.stringify({ 
-            //         userId: tg.initDataUnsafe.user.id, 
-            //         score: newScore 
-            //     })
-            // });
+        // 6. Backend (Supabase) par Data Save karnay ka function
+        async function saveDataToBackend() {
+            if (isSaving || !telegramUser) return;
+            
+            isSaving = true;
+            
+            const { error } = await sb
+                .from('profiles')
+                .update({ score: score, energy: energy }) // Score aur Energy dono update karo
+                .eq('id', telegramUser.id.toString());
+
+            if (error) {
+                console.error('Error saving data:', error);
+            }
+            
+            isSaving = false;
         }
-        */
+        
+        // 7. Energy ko har second refill karnay wala function
+        function refillEnergy() {
+            if (energy < maxEnergy) {
+                energy = Math.min(maxEnergy, energy + energyRefillRate); // Energy barhao, lekin max se ziada na ho
+                updateEnergyDisplay();
+            }
+        }
+        
+        // --- Helper Functions (Display Update) ---
+        function updateScoreDisplay() {
+            scoreDisplay.innerText = score;
+        }
+        
+        function updateEnergyDisplay() {
+            energyText.innerText = `Energy: ${energy}/${maxEnergy}`;
+            const energyPercentage = (energy / maxEnergy) * 100;
+            energyBar.style.width = `${energyPercentage}%`;
+        }
+
+        // --- Game Shuru Karein ---
+
+        // 1. User ka data load karo
+        loadUserData();
+        
+        // 2. Har second energy refill karo
+        setInterval(refillEnergy, 1000); // Har 1000ms (1 second) main energy refill ho gi
+        
+        // 3. Har 30 second baad data zaroor save karo (agar user tap na bhi karay)
+        setInterval(saveDataToBackend, 30000);
 
     </script>
 </body>
